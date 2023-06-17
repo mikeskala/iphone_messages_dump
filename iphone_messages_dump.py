@@ -6,6 +6,7 @@ import csv
 import json
 import sys
 from collections import OrderedDict
+from datetime import datetime, timedelta
 
 """
 The madrid offset is the offset from 1 Jan 1970 to 1 Jan 2001.
@@ -67,19 +68,17 @@ def extract_messages(db_file):
     message_list = []
 
     for row in messages:
-        timestamp = row['date']
-        is_imessage = False
-        if not 'is_madrid' in row:
-            is_imessage = row['service']
+        timestamp = row['date'] / 1000000000
+        is_i_message = 'is_madrid' in row
+        if not is_i_message:      # specifies if it's an iMessage or not, value 0 or 1 (0=SMS/MMS, 1=iMessage)
+            is_i_message = row['service']
             sent = row['is_sent']
             timestamp += MADRID_OFFSET
         else:
-            is_imessage = row['is_madrid']
-            if is_imessage:
-                sent = row['madrid_flags'] in MADRID_FLAGS_SENT
-                timestamp += MADRID_OFFSET
-            else:
-                sent = row['flags'] in [3, 35]
+            sent = row['flags'] in [3, 35]
+        
+        time = datetime.utcfromtimestamp(timestamp)
+        time += timedelta(hours=3)                             # UTC + 3 timezone
 
         if not row['text']:
             skipped += 1
@@ -90,19 +89,14 @@ def extract_messages(db_file):
             continue
         found += 1
 
-        address = ''
-        if 'madrid_handle' in row:
-            address = row.get('address') or row['madrid_handle']
-        else:
-            address = row.get('address') or row['account']
 
         row_data = dict(sent='1' if sent else '0',
-                        service='iMessage' if is_imessage else 'SMS',
-                        subject=(row['subject'] or ''),
-                        text=(row['text'] or '').replace('\n', r'\n'),
-                        timestamp=timestamp,
-                        address=address,
-                        guid=row['guid']
+                        time=time.strftime("%d/%m/%Y, %H:%M"),
+                        text=(row['text'] or '').replace('\n', '[NL]'),
+                        address=row['handle_id'],   # this is the conversation id /group id
+                        # srvc='iMsg' if is_i_message else 'SMS',
+                        # subject=(row['subject'] or ''),
+                        # guid=row['guid'],
                         )
         message_list.append(row_data)
 
@@ -164,15 +158,26 @@ def write_csv(file_object, message_list, ordered_fieldnames, new_file=False):
     writer = csv.DictWriter(file_object, fieldnames=ordered_fieldnames)
     if new_file:
         writer.writeheader()
+    rc = wc = 0
     for item in message_list:
-        writer.writerow(item)
+        try:
+            writer.writerow(item)
+            wc += 1
+        except ValueError as ex:
+            print('Err in Message ', rc, 'skipping it. Text was: ', item['text'], 'Ex:', ex)
+        rc += 1
+    print('Wrote Message ', wc, 'to file')
 
 
 def run():
     args.output_file += ".{0}".format(args.output_data)
 
-    fieldnames = {"timestamp": None, "service": None, "sent": None, "address": None,
-        "subject": None, "text": None, "guid": None}
+    fieldnames = {"time": None,     # of message
+                  "sent": None,     # 1 if sent by me
+                  "text": None,     # of message
+                  "address": None,  # conversation id
+                  #"guid": None, "srvc": None, "subject": None, 
+        }
     ordered_fieldnames = OrderedDict(sorted(fieldnames.items(), key=lambda t: t[0]))
     message_list = get_message_list()
     if args.privacy:
@@ -184,14 +189,14 @@ def run():
         if compared_list:
             print("{0} new messages detected. Adding messages to {1}.".format(compared_count, args.output_file))
             if args.output_data == "csv":
-                with open(args.output_file, 'a') as f:
+                with open(args.output_file, 'a', encoding=args.encoding, newline='') as f:
                     write_csv(f, ordered_fieldnames, compared_list)
             elif args.output_data == "json":
                 with open(args.output_file, "r") as r:
                     reader = json.load(r)
                     for item in compared_list:
                         reader.append(item)
-                    with open(args.output_file, "w") as f:
+                    with open(args.output_file, "w", encoding=args.encoding, newline='') as f:
                         json.dump(message_list, f)
 
                 print(compared_list)
@@ -199,17 +204,17 @@ def run():
             print("{0} new messages detected. No messages added.".format(compared_count))
     else:
         print('New file detected. Writing {0} messages to new file at {1}'.format(message_count, args.output_file))
-        if args.output_data == "csv":
-            with open(args.output_file, "w") as f:
+        with open(args.output_file, "w", encoding=args.encoding, newline='') as f:
+            if args.output_data == "csv":
                 write_csv(f, message_list, ordered_fieldnames, True)
-        elif args.output_data == "json":
-            with open(args.output_file, "w") as f:
-                json.dump(message_list, f)
+            elif args.output_data == "json":
+                with open(args.output_file, "w") as f:
+                    json.dump(message_list, f)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert iMessage texts from iPhone backup files to readable data formats."
             "Supported formats include csv and json.")
-    parser.add_argument("-d", "--output_data", type=str, default="json",
+    parser.add_argument("-d", "--output_data", type=str, default="csv",
             help="The format of data output by the program. csv and json are supported.")
     parser.add_argument("-i", "--input_pattern", type=str, default=backup_location(sys.platform),
             help="The location(s) of your iPhone backup files. Will match patterns according to glob syntax.")
@@ -217,7 +222,9 @@ if __name__ == "__main__":
             help="The output file name.")
     parser.add_argument("-s", "--sent_only", action="store_true", default=False,
             help="Output only sent texts. Excludes all other texts.")
-    parser.add_argument("-p", "--privacy", action="store_true", default=True,
+    parser.add_argument("-p", "--privacy", action="store_true", default=False,
             help="Enable privacy measures.")
+    parser.add_argument("-e", "--encoding", action="store_true", default='utf-8',
+            help="Output encoding.")
     args = parser.parse_args()
     run()
