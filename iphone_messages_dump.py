@@ -96,7 +96,7 @@ def extract_messages(db_file):
                         address=row['handle_id'],   # this is the conversation id /group id
                         # srvc='iMsg' if is_i_message else 'SMS',
                         # subject=(row['subject'] or ''),
-                        # guid=row['guid'],
+                        guid=row['guid'],
                         )
         message_list.append(row_data)
 
@@ -172,13 +172,14 @@ def write_csv(file_object, message_list, ordered_fieldnames, new_file=False):
 def run():
     args.output_file += ".{0}".format(args.output_data)
 
-    fieldnames = {"time": None,     # of message
-                  "sent": None,     # 1 if sent by me
-                  "text": None,     # of message
-                  "address": None,  # conversation id
-                  #"guid": None, "srvc": None, "subject": None, 
-        }
-    ordered_fieldnames = OrderedDict(sorted(fieldnames.items(), key=lambda t: t[0]))
+    field_names = {
+        "address": None,    # conversation id
+        "sent": None,       # 1 if sent by me
+        "time": None,       # of message
+        "text": None,       # of message
+        "guid": None,       # message id
+        # "srvc": None, "subject": None, 
+    }
     message_list = get_message_list()
     if args.privacy:
         set_privacy(message_list)
@@ -190,7 +191,7 @@ def run():
             print("{0} new messages detected. Adding messages to {1}.".format(compared_count, args.output_file))
             if args.output_data == "csv":
                 with open(args.output_file, 'a', encoding=args.encoding, newline='') as f:
-                    write_csv(f, ordered_fieldnames, compared_list)
+                    write_csv(f, field_names, compared_list)
             elif args.output_data == "json":
                 with open(args.output_file, "r") as r:
                     reader = json.load(r)
@@ -206,7 +207,7 @@ def run():
         print('New file detected. Writing {0} messages to new file at {1}'.format(message_count, args.output_file))
         with open(args.output_file, "w", encoding=args.encoding, newline='') as f:
             if args.output_data == "csv":
-                write_csv(f, message_list, ordered_fieldnames, True)
+                write_csv(f, message_list, field_names, True)
             elif args.output_data == "json":
                 with open(args.output_file, "w") as f:
                     json.dump(message_list, f)
