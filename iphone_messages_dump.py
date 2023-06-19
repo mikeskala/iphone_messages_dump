@@ -80,20 +80,29 @@ def extract_messages(db_file):
         time = datetime.utcfromtimestamp(timestamp)
         time += timedelta(hours=3)                             # UTC + 3 timezone
 
-        if not row['text']:
+        # Use text or attributedBody as body depending on whether it's a plain text or rich media message
+        # see: https://medium.com/@kellytgold/extracting-imessage-and-address-book-data-b6e2e5729b21
+        if row['text'] is not None:
+            msg_body = row['text']
+        elif row['attributedBody'] is not None: 
+            alter_body = row['attributedBody'].decode('utf-8', errors='replace')
+            if "NSNumber" in str(alter_body):
+                alter_body = str(alter_body).split("NSNumber")[0]
+                if "NSString" in alter_body:
+                    alter_body = str(alter_body).split("NSString")[1]
+                    if "NSDictionary" in alter_body:
+                        alter_body = str(alter_body).split("NSDictionary")[0]
+                        alter_body = alter_body[6:-12]
+                        msg_body = alter_body
+        
+        if msg_body is None:
             skipped += 1
             continue
-
-        if args.sent_only and not sent:
-            skipped += 1
-            continue
-        found += 1
-
 
         row_data = dict(sent='1' if sent else '0',
-                        time=time.strftime("%d/%m/%Y, %H:%M"),
-                        text=(row['text'] or '').replace('\n', '[NL]'),
-                        address=row['handle_id'],   # this is the conversation id /group id
+                        time = time.strftime(" %d/%m/%Y, %H:%M"),
+                        address = row['handle_id'],   # this is the conversation id /group id
+                        text = msg_body.replace('\n', '[NL]'),
                         # srvc='iMsg' if is_i_message else 'SMS',
                         # subject=(row['subject'] or ''),
                         guid=row['guid'],
