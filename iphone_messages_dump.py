@@ -82,6 +82,7 @@ def extract_messages(db_file):
 
         # Use text or attributedBody as body depending on whether it's a plain text or rich media message
         # see: https://medium.com/@kellytgold/extracting-imessage-and-address-book-data-b6e2e5729b21
+        msg_body = None
         if row['text'] is not None:
             msg_body = row['text']
         elif row['attributedBody'] is not None: 
