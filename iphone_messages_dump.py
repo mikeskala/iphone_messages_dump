@@ -121,12 +121,12 @@ def compare_files(file_name, message_list):
     for item in message_list:
         message_guid_list.append(item['guid'])
 
-    if args.output_data == "csv":
+    if args.output_format == "csv":
         with open(file_name, newline='') as f:
             reader = csv.DictReader(f)
             for item in reader:
                 file_guid_list.append(item['guid'])
-    elif args.output_data == "json":
+    elif args.output_format == "json":
         with open(file_name, "r") as f:
             reader = json.load(f)
             for item in reader:
@@ -174,11 +174,24 @@ def write_csv(file_object, message_list, ordered_fieldnames, new_file=False):
         except ValueError as ex:
             print('Err in Message ', rc, 'skipping it. Text was: ', item['text'], 'Ex:', ex)
         rc += 1
-    print('Wrote Message ', wc, 'to file')
+    print('Wrote Messages ', wc, 'to file')
+
+def write_txt(file_object, message_list, fieldnames):
+    rc = wc = 0
+    for item in message_list:
+        try:
+            for field in fieldnames:
+                file_object.write(f"{field}: {str(item[field])}\n")
+            file_object.write("\n")
+            wc += 1
+        except ValueError as ex:
+            print('Err in Message ', rc, 'skipping it. Text was: ', item['text'], 'Ex:', ex)
+        rc += 1
+    print('Wrote Messages ', wc, 'to file')
 
 
 def run():
-    args.output_file += f".{args.output_format}"
+    out_file = f"{args.output_file}.{args.output_format}"
 
     field_names = {
         "address": None,    # conversation id
@@ -192,38 +205,45 @@ def run():
     if args.privacy:
         set_privacy(message_list)
     message_count = len(message_list)
-    if os.path.exists(args.output_file):
-        compared_list = compare_files(args.output_file, message_list)
+    
+    if args.append and os.path.exists(out_file):
+        if args.output_format == "txt":
+            print("append is not supported for this file format")
+            return
+        compared_list = compare_files(out_file, message_list)
         compared_count = len(compared_list)
         if compared_list:
-            print("{0} new messages detected. Adding messages to {1}.".format(compared_count, args.output_file))
-            if args.output_data == "csv":
-                with open(args.output_file, 'a', encoding=args.encoding, newline='') as f:
+            print(f"{compared_count} new messages detected. Adding messages to {out_file}.")
+            if args.output_format == "csv":
+                with open(out_file, 'a', encoding=args.encoding, newline='') as f:
                     write_csv(f, field_names, compared_list)
-            elif args.output_data == "json":
-                with open(args.output_file, "r") as r:
+            elif args.output_format == "json":
+                with open(out_file, "r") as r:
                     reader = json.load(r)
                     for item in compared_list:
                         reader.append(item)
-                    with open(args.output_file, "w", encoding=args.encoding, newline='') as f:
+                    with open(out_file, "w", encoding=args.encoding, newline='') as f:
                         json.dump(message_list, f)
 
                 print(compared_list)
         else:
             print(f"{compared_count} new messages detected. No messages added.")
     else:
-        print(f'Writing {message_count} messages to new file at {args.output_file}')
-        with open(args.output_file, "w", encoding=args.encoding, newline='') as f:
-            if args.output_data == "csv":
+        print(f'Writing {message_count} messages to new file at {out_file}')
+        with open(out_file, "w", encoding=args.encoding, newline='') as f:
+            if args.output_format == "csv":
                 write_csv(f, message_list, field_names, True)
-            elif args.output_data == "json":
-                with open(args.output_file, "w") as f:
+            elif args.output_format == "txt":
+                write_txt(f, message_list, field_names)
+            elif args.output_format == "json":
+                with open(out_file, "w") as f:
                     json.dump(message_list, f)
+                    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Convert iMessage texts from iPhone backup files to readable data formats."
-            "Supported formats include csv and json.")
-    parser.add_argument("-d", "--output_data", type=str, default="csv",
+            "Supported formats include csv, txt and json.")
+    parser.add_argument("-f", "--output_format", type=str, default="csv",
             help="The format of data output by the program. csv and json are supported.")
     parser.add_argument("-i", "--input_pattern", type=str, default=backup_location(sys.platform),
             help="The location(s) of your iPhone backup files. Will match patterns according to glob syntax.")
@@ -233,7 +253,9 @@ if __name__ == "__main__":
             help="Output only sent texts. Excludes all other texts.")
     parser.add_argument("-p", "--privacy", action="store_true", default=False,
             help="Enable privacy measures.")
-    parser.add_argument("-e", "--encoding", action="store_true", default='utf-8',
+    parser.add_argument("-e", "--encoding", type=str, default='utf-8',
             help="Output encoding.")
+    parser.add_argument("-a", "--append", action="store_true", default=False,
+            help="Append all found messages to output file (if exists).")
     args = parser.parse_args()
     run()
