@@ -63,7 +63,6 @@ class DB():
 def extract_messages(db_file):
     db = DB(db_file)
     skipped = 0
-    found = 0
     messages = db.query("select * from message")
     message_list = []
 
@@ -110,7 +109,7 @@ def extract_messages(db_file):
                         )
         message_list.append(row_data)
 
-    print('found {0} skipped {1}'.format(found, skipped))
+    print(f"found {len(message_list)} messages in the backup DB ({skipped} skipped)")
     return message_list
 
 
@@ -147,7 +146,7 @@ def get_message_list():
     pattern = os.path.expanduser(args.input_pattern)
     input_pattern_list = glob.glob(pattern)
     for db_file in input_pattern_list:
-        print("reading {0}.".format(db_file))
+        print(f"reading {db_file}.")
         messages = extract_messages(db_file)
         for item in messages:
             message_list.append(item)
@@ -158,7 +157,6 @@ def set_privacy(message_list):
     """
     Hide values by default for privacy.
     """
-
     privacy_text = "Text hidden for privacy. Use -p flag to enable text."
     for item in message_list:
         item['text'] = privacy_text
@@ -180,7 +178,7 @@ def write_csv(file_object, message_list, ordered_fieldnames, new_file=False):
 
 
 def run():
-    args.output_file += ".{0}".format(args.output_data)
+    args.output_file += f".{args.output_format}"
 
     field_names = {
         "address": None,    # conversation id
@@ -212,9 +210,9 @@ def run():
 
                 print(compared_list)
         else:
-            print("{0} new messages detected. No messages added.".format(compared_count))
+            print(f"{compared_count} new messages detected. No messages added.")
     else:
-        print('New file detected. Writing {0} messages to new file at {1}'.format(message_count, args.output_file))
+        print(f'Writing {message_count} messages to new file at {args.output_file}')
         with open(args.output_file, "w", encoding=args.encoding, newline='') as f:
             if args.output_data == "csv":
                 write_csv(f, message_list, field_names, True)
