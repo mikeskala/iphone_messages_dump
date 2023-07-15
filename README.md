@@ -6,10 +6,13 @@ Handles several output data formats including csv, txt and json.
 Usage:
 1. Connect your iPhone to a computer and make a backup using iTunes
 2. Run this script using Python (command line) to export your text iMessages and SMS.
-  Some usage examples:
-> python iphone_messages_dump.py
-> python iphone_messages_dump.py -f txt -o my_dump_file
 
+  Some usage examples:
+```python
+> python iphone_messages_dump.py
+> python iphone_messages_dump.py -f txt -o my_dump_file -g 55
+
+```
 
 Originally based on Jehiah Czebotar's script to dump iMessages to a csv file.
 
