@@ -1,14 +1,14 @@
 iphone_messages_dump
 ====================
 
-A python script to dump texts from iMessage from an iPhone backup to a file.
+A python script to dump iMessage data (text and metadata) from an iPhone backup to a file.
 Handles several output data formats including csv, txt and json.
 Usage:
 1. Connect your iPhone to a computer and make a backup using iTunes
 2. Run this script using Python (command line) to export your text iMessages and SMS.
   Some usage examples:
 > python iphone_messages_dump.py
-> python iphone_messages_dump.py --output_format txt --output_file my_text
+> python iphone_messages_dump.py -f txt -o my_dump_file
 
 
 Originally based on Jehiah Czebotar's script to dump iMessages to a csv file.
@@ -26,22 +26,10 @@ TODO:
 
 List of done:
 
-- Proper license file
-- Dynamically determine OS (Mac/Windows) and use default location.
-- Refactor to patterns.
-- Create dictionaries explicitly instead of implicitly.
-- Use argparse instead of optparse.
-- PEP8 compliance.
-- After refactor, encoding should be better handled so encoding hack shouldn't be required.
-- Python 3 support
-- Date time stamp! (Replaced by compare logic.)
-- Better unicode handling
-- Python 3.x style string format.
-- When privacy is enabled, write a different file. Currently writing with and without privacy will cause duplicate items.
-- Performance improvements.
-- Output choice. Need to add support for JSON.
+- Forked from: https://github.com/echohack/iphone_messages_dump
+- Better unicode handling: use utf-8 encoding (to support messages in hebrew)
+- Skip message with empty 'text' field
+- Output choice: Add support for TXT.
+- Filter messages by group-id
+- 
 
-Backlog:
-
-- Proper installation (via pip)
-- Add feature to dump parsed data?

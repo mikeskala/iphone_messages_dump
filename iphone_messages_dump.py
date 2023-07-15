@@ -62,7 +62,6 @@ class DB():
 
 def extract_messages(db_file):
     db = DB(db_file)
-    skipped = 0
     messages = db.query("select * from message")
     message_list = []
 
@@ -71,10 +70,10 @@ def extract_messages(db_file):
         is_i_message = 'is_madrid' in row
         if not is_i_message:      # specifies if it's an iMessage or not, value 0 or 1 (0=SMS/MMS, 1=iMessage)
             is_i_message = row['service']
-            sent = row['is_sent']
+            is_sent = row['is_sent']
             timestamp += MADRID_OFFSET
         else:
-            sent = row['flags'] in [3, 35]
+            is_sent = row['flags'] in [3, 35]
         
         time = datetime.utcfromtimestamp(timestamp)
         time += timedelta(hours=3)                             # UTC + 3 timezone
@@ -95,11 +94,10 @@ def extract_messages(db_file):
                         alter_body = alter_body[6:-12]
                         msg_body = alter_body
         
-        if msg_body is None:
-            skipped += 1
+        if args.group_id > 0 and row['handle_id'] != args.group_id or msg_body is None:
             continue
 
-        row_data = dict(sent='1' if sent else '0',
+        row_data = dict(sent='1' if is_sent else '0',
                         time = time.strftime(" %d/%m/%Y, %H:%M"),
                         address = row['handle_id'],   # this is the conversation id /group id
                         text = msg_body.replace('\n', '[NL]'),
@@ -109,7 +107,7 @@ def extract_messages(db_file):
                         )
         message_list.append(row_data)
 
-    print(f"found {len(message_list)} messages in the backup DB ({skipped} skipped)")
+    print(f"Got {len(message_list)} messages out of total {len(messages)} in the backup DB")
     return message_list
 
 
@@ -180,9 +178,8 @@ def write_txt(file_object, message_list, fieldnames):
     rc = wc = 0
     for item in message_list:
         try:
-            for field in fieldnames:
-                file_object.write(f"{field}: {str(item[field])}\n")
-            file_object.write("\n")
+            file_object.write(f"Sent by: {'Me' if (item['sent'] == '1') else 'Her'} {item['time']}\n")
+            file_object.write(item['text'] + "\n")
             wc += 1
         except ValueError as ex:
             print('Err in Message ', rc, 'skipping it. Text was: ', item['text'], 'Ex:', ex)
@@ -193,7 +190,7 @@ def write_txt(file_object, message_list, fieldnames):
 def run():
     out_file = f"{args.output_file}.{args.output_format}"
 
-    field_names = {
+    field_names = {         # Select which fields to collect:
         "address": None,    # conversation id
         "sent": None,       # 1 if sent by me
         "time": None,       # of message
@@ -255,6 +252,8 @@ if __name__ == "__main__":
             help="Enable privacy measures.")
     parser.add_argument("-e", "--encoding", type=str, default='utf-8',
             help="Output encoding.")
+    parser.add_argument("-g", "--group_id", type=int, default=-1,
+            help="Only include messages belonging to the given group id.")
     parser.add_argument("-a", "--append", action="store_true", default=False,
             help="Append all found messages to output file (if exists).")
     args = parser.parse_args()
